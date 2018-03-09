@@ -27,6 +27,7 @@ export default {
 			tileCount: 0,
 			stackOffset: 4, 
 			socket: null, 
+			sync: {userId: null, from: null, to: null}, 
     }
   }, 
 	methods: {
@@ -94,6 +95,10 @@ export default {
 			x = Math.floor(x / self.width)
 			y = Math.floor(y / self.height)
 
+			self.sync.to = {x, y};
+			// console.log(['chk', {domId: ui.helper[0].id, from: self.sync.from, to: self.sync.to}]);
+			this.socket.emit('sync', {userId: self.sync.userId, cmd: 'moveto', args: {domId: ui.helper[0].id, to: self.sync.to} });
+
 			// place tile; apply offset if it was placed on a stack
 			$(ui.helper).css({left: x * self.width, top: y * self.height})
 			self.applyOffset(ui.helper, x, y);
@@ -118,16 +123,56 @@ export default {
 		window.Event.$on("pick-up-start", (ui) => {
 			let x = Math.floor(ui.position.left/self.width);
 			let y = Math.floor(ui.position.top/self.height);
+
+			self.sync.from = {x, y};
+			// console.log(['chk', {userId: self.sync.userId, domId: ui.helper[0].id, from: self.sync.from}]);
+			this.socket.emit('sync', {userId: self.sync.userId, cmd: 'movefrom', args: {domId: ui.helper[0].id, from: self.sync.from} });
+
 			self.gameBoard[y][x].pop();
 
 			console.log(['tile picked up; removed from data table', ui.helper[0].id, x, y]);
 		});
 
-		this.socket = ioClient.connect("http://localhost:3000");
+		this.socket = ioClient.connect("http://tigris.reliacode.com:8082");
 		console.log(["should have connected to io", this.socket]);
 
 		this.socket.on('hello', function(data){
 			console.log(['hello received', data]);
+			if (data.userId === null) {
+				self.sync.userId = data.userId;
+			}
+		});
+		this.socket.on('sync', function(data){
+			let domId, toX, toY, fromX, fromY, ui = null;
+
+			console.log(['sync command received', JSON.stringify(data)]);
+			if (data.userId === self.sync.userId) {
+				console.log(['event was triggered by this user; events already applied', data.userId]);
+				return;
+			}
+			switch (data.cmd) {
+				case 'moveto':
+					toX = data.args.to.x;
+					toY = data.args.to.y;
+					domId = data.args.domId;
+					ui = $(domId)
+
+					// TODO: need to have another way to deal with conflicts when two or more players
+					// 		are attempting to move the same piece at the same time
+					console.log(['chk, dropped', toX, toY, domId, ui]);
+					window.Event.$emit("dropped", ui, x, y);
+					break;
+
+				case 'movefrom':
+					fromX = data.args.from.x;
+					fromY = data.args.from.y;
+					domId = data.args.domId;
+					ui = $(domId)
+
+					console.log(['chk, pick-up-start', fromX, fromY, domId, ui]);
+					window.Event.$emit("pick-up-start", ui, fromX, fromY);
+					break;
+			}
 		});
     this.socket.emit('hello', { greeting: 'hi' });
 		

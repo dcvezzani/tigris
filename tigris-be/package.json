@@ -3,9 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www",
-    "watch": "DEBUG=tigris-be:* nodemon ./bin/www",
-    "debug": "DEBUG=tigris-be:* npm start"
+    "start": "HOST=0.0.0.0 PORT=8082 node ./bin/www",
+    "watch": "HOST=0.0.0.0 PORT=8082 DEBUG=tigris-be:* nodemon ./bin/www",
+    "debug": "HOST=0.0.0.0 PORT=8082 DEBUG=tigris-be:* npm start"
   },
   "dependencies": {
     "body-parser": "~1.18.2",
