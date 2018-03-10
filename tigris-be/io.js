@@ -19,8 +19,11 @@ module.exports = function (io) {
 			console.log(['sync command received', JSON.stringify(data)]);
 
 			switch (data.cmd) {
+				case 'movefrom':
+					io.emit('sync', {userId: data.userId, cmd: 'movefrom', args: data.args});
+					break;
 				case 'moveto':
-					socket.emit('sync', {userId: data.userId, cmd: 'moveto', args: data.args});
+					io.emit('sync', {userId: data.userId, cmd: 'moveto', args: data.args});
 					break;
 			}
 		});

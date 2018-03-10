@@ -78,33 +78,41 @@ export default {
 				stack: '#containment-wrapper div', 
 				grid: [ 40, 40 ], 
 				start: function( event, ui ) {
-					window.Event.$emit("pick-up-start", ui);
+          let asdf = 2-1;
+					window.Event.$emit("pick-up-start", ui, ui.helper[0].offsetLeft, ui.helper[0].offsetTop);
 				}
 			});
 			
 			$( "#playing-field" ).droppable({
 				drop: function( event, ui ) {
+          let asdf = 2-1;
 					window.Event.$emit("dropped", ui, event.clientX - self.offsetx, event.clientY - self.offsety);
 				}
 			});
 		} );
 
-		window.Event.$on("dropped", (ui, x, y) => {
-			
-			// determine where in the game board data that tile should go
-			x = Math.floor(x / self.width)
-			y = Math.floor(y / self.height)
+		window.Event.$on("dropped", (ui, x, y, fromSelf=true) => {
+			if (fromSelf === true) {
+				// determine where in the game board data that tile should go
+				x = Math.floor(x / self.width)
+				y = Math.floor(y / self.height)
+			}
 
 			self.sync.to = {x, y};
-			// console.log(['chk', {domId: ui.helper[0].id, from: self.sync.from, to: self.sync.to}]);
-			this.socket.emit('sync', {userId: self.sync.userId, cmd: 'moveto', args: {domId: ui.helper[0].id, to: self.sync.to} });
+
+			if (fromSelf === true) {
+        // console.log(['chk', {domId: `#${ui.helper[0].id}`, from: self.sync.from, to: self.sync.to}]);
+        this.socket.emit('sync', {userId: self.sync.userId, cmd: 'moveto', args: {domId: `#${ui.helper[0].id}`, to: self.sync.to} });
+			}
+
+      let gp = (fromSelf === true) ? ui.helper[0] : ui[0];
 
 			// place tile; apply offset if it was placed on a stack
-			$(ui.helper).css({left: x * self.width, top: y * self.height})
-			self.applyOffset(ui.helper, x, y);
+			$(gp).css({left: x * self.width, top: y * self.height})
+			self.applyOffset(gp, x, y);
 
 			// add to game board data grid
-			self.gameBoard[y][x].push (ui.helper);
+			self.gameBoard[y][x].push (gp);
 
 			// refresh tile visibility for the row
 			let zidx = 0;
@@ -117,20 +125,28 @@ export default {
 				}
 			}
 
-			console.log(['tile was dropped; added in data table', ui.helper[0].id, x, y]);
+			console.log(['tile was dropped; added in data table', gp.id, x, y]);
 		});
 
-		window.Event.$on("pick-up-start", (ui) => {
-			let x = Math.floor(ui.position.left/self.width);
-			let y = Math.floor(ui.position.top/self.height);
+		window.Event.$on("pick-up-start", (ui, x, y, fromSelf=true) => {
+			if (fromSelf === true) {
+				// determine where in the game board data that tile should go
+				x = Math.floor(x / self.width)
+				y = Math.floor(y / self.height)
+			}
 
 			self.sync.from = {x, y};
-			// console.log(['chk', {userId: self.sync.userId, domId: ui.helper[0].id, from: self.sync.from}]);
-			this.socket.emit('sync', {userId: self.sync.userId, cmd: 'movefrom', args: {domId: ui.helper[0].id, from: self.sync.from} });
+
+			if (fromSelf === true) {
+        // console.log(['chk', {userId: self.sync.userId, domId: `#${ui.helper[0].id}`, from: self.sync.from}]);
+        this.socket.emit('sync', {userId: self.sync.userId, cmd: 'movefrom', args: {domId: `#${ui.helper[0].id}`, from: self.sync.from} });
+			}
+
+      let gp = (fromSelf === true) ? ui.helper[0] : ui[0];
 
 			self.gameBoard[y][x].pop();
 
-			console.log(['tile picked up; removed from data table', ui.helper[0].id, x, y]);
+			console.log(['tile picked up; removed from data table', gp.id, x, y]);
 		});
 
 		this.socket = ioClient.connect("http://tigris.reliacode.com:8082");
@@ -138,7 +154,7 @@ export default {
 
 		this.socket.on('hello', function(data){
 			console.log(['hello received', data]);
-			if (data.userId === null) {
+			if (self.sync.userId === null) {
 				self.sync.userId = data.userId;
 			}
 		});
@@ -160,7 +176,7 @@ export default {
 					// TODO: need to have another way to deal with conflicts when two or more players
 					// 		are attempting to move the same piece at the same time
 					console.log(['chk, dropped', toX, toY, domId, ui]);
-					window.Event.$emit("dropped", ui, x, y);
+					window.Event.$emit("dropped", ui, toX, toY, false);
 					break;
 
 				case 'movefrom':
@@ -170,7 +186,7 @@ export default {
 					ui = $(domId)
 
 					console.log(['chk, pick-up-start', fromX, fromY, domId, ui]);
-					window.Event.$emit("pick-up-start", ui, fromX, fromY);
+					window.Event.$emit("pick-up-start", ui, fromX, fromY, false);
 					break;
 			}
 		});
