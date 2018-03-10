@@ -46,6 +46,20 @@ export default {
 
 			$(gp).css({ left: (left + stackOffset) + 'px', top: (top + stackOffset) + 'px' });
 		}, 
+    renderTileVisibility (row) {
+      const self = this;
+      // refresh tile visibility for the row
+      let zidx = 0;
+      for (let col=15; col>=0; col-=1) {
+        // for (let tileidx=self.gameBoard[row][col].length-1; tileidx>=0; tileidx-=1) {
+        for (let tile of self.gameBoard[row][col]) {
+          // let tile = self.gameBoard[row][col][tileidx];
+          $(tile).css('z-index', zidx);
+          zidx += 1;
+        }
+      }
+    }, 
+  
 	}, 
 	mounted () {
 		var self = this;
@@ -78,34 +92,33 @@ export default {
 				stack: '#containment-wrapper div', 
 				grid: [ 40, 40 ], 
 				start: function( event, ui ) {
-          let asdf = 2-1;
-					window.Event.$emit("pick-up-start", ui, ui.helper[0].offsetLeft, ui.helper[0].offsetTop);
+          const gp = ui.helper[0];
+					window.Event.$emit("pick-up-start", gp, gp.offsetLeft, gp.offsetTop);
 				}
 			});
 			
 			$( "#playing-field" ).droppable({
 				drop: function( event, ui ) {
-          let asdf = 2-1;
-					window.Event.$emit("dropped", ui, event.clientX - self.offsetx, event.clientY - self.offsety);
+          const gp = ui.helper[0];
+					window.Event.$emit("dropped", gp, event.clientX - self.offsetx, event.clientY - self.offsety);
 				}
 			});
 		} );
 
-		window.Event.$on("dropped", (ui, x, y, fromSelf=true) => {
-			if (fromSelf === true) {
-				// determine where in the game board data that tile should go
-				x = Math.floor(x / self.width)
-				y = Math.floor(y / self.height)
-			}
+		window.Event.$on("dropped", (gp, x, y, fromSelf=true) => {
+			const coords = {x, y};
+
+      // determine where in the game board data that tile should go
+      x = Math.floor(x / self.width)
+      y = Math.floor(y / self.height)
 
 			self.sync.to = {x, y};
 
 			if (fromSelf === true) {
-        // console.log(['chk', {domId: `#${ui.helper[0].id}`, from: self.sync.from, to: self.sync.to}]);
-        this.socket.emit('sync', {userId: self.sync.userId, cmd: 'moveto', args: {domId: `#${ui.helper[0].id}`, to: self.sync.to} });
+        // console.log(['chk', {domId: `#${gp.id}`, from: self.sync.from, to: self.sync.to}]);
+        this.socket.emit('sync', {userId: self.sync.userId, cmd: 'moveto', args: {domId: `#${gp.id}`, to: coords} });
 			}
 
-      let gp = (fromSelf === true) ? ui.helper[0] : ui[0];
 
 			// place tile; apply offset if it was placed on a stack
 			$(gp).css({left: x * self.width, top: y * self.height})
@@ -114,21 +127,15 @@ export default {
 			// add to game board data grid
 			self.gameBoard[y][x].push (gp);
 
-			// refresh tile visibility for the row
-			let zidx = 0;
-			for (let col=15; col>=0; col-=1) {
-				// for (let tileidx=self.gameBoard[y][col].length-1; tileidx>=0; tileidx-=1) {
-				for (let tile of self.gameBoard[y][col]) {
-					// let tile = self.gameBoard[y][col][tileidx];
-					$(tile).css('z-index', zidx);
-					zidx += 1;
-				}
-			}
+      self.renderTileVisibility(y);
 
 			console.log(['tile was dropped; added in data table', gp.id, x, y]);
 		});
 
-		window.Event.$on("pick-up-start", (ui, x, y, fromSelf=true) => {
+		window.Event.$on("pick-up-start", (gp, x, y, fromSelf=true) => {
+      console.log(['pick-up-start', gp, x, y, fromSelf]);
+			const coords = {x, y};
+
 			if (fromSelf === true) {
 				// determine where in the game board data that tile should go
 				x = Math.floor(x / self.width)
@@ -138,11 +145,9 @@ export default {
 			self.sync.from = {x, y};
 
 			if (fromSelf === true) {
-        // console.log(['chk', {userId: self.sync.userId, domId: `#${ui.helper[0].id}`, from: self.sync.from}]);
-        this.socket.emit('sync', {userId: self.sync.userId, cmd: 'movefrom', args: {domId: `#${ui.helper[0].id}`, from: self.sync.from} });
+        // console.log(['chk', {userId: self.sync.userId, domId: `#${gp.id}`, from: self.sync.from}]);
+        this.socket.emit('sync', {userId: self.sync.userId, cmd: 'movefrom', args: {domId: `#${gp.id}`, from: self.sync.from} });
 			}
-
-      let gp = (fromSelf === true) ? ui.helper[0] : ui[0];
 
 			self.gameBoard[y][x].pop();
 
@@ -159,7 +164,7 @@ export default {
 			}
 		});
 		this.socket.on('sync', function(data){
-			let domId, toX, toY, fromX, fromY, ui = null;
+			let domId, toX, toY, fromX, fromY, gp = null;
 
 			console.log(['sync command received', JSON.stringify(data)]);
 			if (data.userId === self.sync.userId) {
@@ -171,22 +176,22 @@ export default {
 					toX = data.args.to.x;
 					toY = data.args.to.y;
 					domId = data.args.domId;
-					ui = $(domId)
+					gp = $(domId)
 
 					// TODO: need to have another way to deal with conflicts when two or more players
 					// 		are attempting to move the same piece at the same time
-					console.log(['chk, dropped', toX, toY, domId, ui]);
-					window.Event.$emit("dropped", ui, toX, toY, false);
+					console.log(['chk, dropped', gp, toX, toY, false]);
+					window.Event.$emit("dropped", gp, toX, toY, false);
 					break;
 
 				case 'movefrom':
 					fromX = data.args.from.x;
 					fromY = data.args.from.y;
 					domId = data.args.domId;
-					ui = $(domId)
+					gp = $(domId)
 
-					console.log(['chk, pick-up-start', fromX, fromY, domId, ui]);
-					window.Event.$emit("pick-up-start", ui, fromX, fromY, false);
+					console.log(['chk, pick-up-start', gp, fromX, fromY, false]);
+					window.Event.$emit("pick-up-start", gp, fromX, fromY, false);
 					break;
 			}
 		});
