@@ -59,53 +59,8 @@ export default {
         }
       }
     }, 
-  
-	}, 
-	mounted () {
-		var self = this;
-
-		$( function() {
-
-			// initialize gameboard data
-			for (let idx=0; idx<176; idx+=1) {
-				let x = (idx % 16)
-				let y = Math.floor(idx / 16)
-				self.gameBoard[y][x] = [];
-			}
-
-			// place tiles on game board
-			for (let idx=0; idx<6; idx+=1) {
-				self.tileCount += 1;
-				let chk = $( "#containment-wrapper" ).append(' <div id="game-piece-' + self.tileCount + '" class="game-piece draggable ui-widget-content"> <p>' + (idx + 1) + '</p> </div> ');
-				self.placeGamePiece ($(chk).children().last(), 2, 2);
-			}
-
-				let chk = $( "#containment-wrapper" ).append(' <div id="game-piece-' + self.tileCount + '" class="game-piece game-piece-monument draggable ui-widget-content"> <p>M</p> </div> ');
-				self.placeGamePiece ($(chk).children().last(), 4, 4);
-			
-	
-			// define draggable behavior
-			$( ".game-piece" ).draggable({ 
-				containment: "#containment-wrapper", 
-				scroll: false, 
-				opacity: 0.7,
-				stack: '#containment-wrapper div', 
-				grid: [ 40, 40 ], 
-				start: function( event, ui ) {
-          const gp = ui.helper[0];
-					window.Event.$emit("pick-up-start", gp, gp.offsetLeft, gp.offsetTop);
-				}
-			});
-			
-			$( "#playing-field" ).droppable({
-				drop: function( event, ui ) {
-          const gp = ui.helper[0];
-					window.Event.$emit("dropped", gp, event.clientX - self.offsetx, event.clientY - self.offsety);
-				}
-			});
-		} );
-
-		window.Event.$on("dropped", (gp, x, y, fromSelf=true) => {
+    onDropped (gp, x, y, fromSelf=true) {
+      var self = this;
 			const coords = {x, y};
 
       // determine where in the game board data that tile should go
@@ -130,9 +85,9 @@ export default {
       self.renderTileVisibility(y);
 
 			console.log(['tile was dropped; added in data table', gp.id, x, y]);
-		});
-
-		window.Event.$on("pick-up-start", (gp, x, y, fromSelf=true) => {
+    },
+    onPickupStart (gp, x, y, fromSelf=true) {
+      var self = this;
       console.log(['pick-up-start', gp, x, y, fromSelf]);
 			const coords = {x, y};
 
@@ -152,22 +107,57 @@ export default {
 			self.gameBoard[y][x].pop();
 
 			console.log(['tile picked up; removed from data table', gp.id, x, y]);
-		});
-
-		this.socket = ioClient.connect("http://tigris.reliacode.com:8082");
-		console.log(["should have connected to io", this.socket]);
-
-		this.socket.on('hello', function(data){
-			console.log(['hello received', data]);
-			if (self.sync.userId === null) {
-				self.sync.userId = data.userId;
+    },
+    onInit () {
+      var self = this;
+			// initialize gameboard data
+			for (let idx=0; idx<176; idx+=1) {
+				let x = (idx % 16)
+				let y = Math.floor(idx / 16)
+				self.gameBoard[y][x] = [];
 			}
-		});
-		this.socket.on('sync', function(data){
+
+			// place tiles on game board
+			for (let idx=0; idx<6; idx+=1) {
+				let chk = $( "#containment-wrapper" ).append(' <div id="game-piece-' + (self.tileCount++) + '" class="game-piece draggable ui-widget-content"> <p>' + (idx + 1) + '</p> </div> ');
+				self.placeGamePiece ($(chk).children().last(), 2, 2);
+			}
+
+      let chk = $( "#containment-wrapper" ).append(' <div id="game-piece-' + (self.tileCount++) + '" class="game-piece game-piece-monument draggable ui-widget-content"> <p>M</p> </div> ');
+      self.placeGamePiece ($(chk).children().last(), 4, 4);
+			
+	
+			// define draggable behavior
+			$( ".game-piece" ).draggable({ 
+				containment: "#containment-wrapper", 
+				scroll: false, 
+				opacity: 0.7,
+				stack: '#containment-wrapper div', 
+				grid: [ 40, 40 ], 
+				start: function( event, ui ) {
+          const gp = ui.helper[0];
+          self.onPickupStart (gp, gp.offsetLeft, gp.offsetTop);
+				}
+			});
+			
+			$( "#playing-field" ).droppable({
+				drop: function( event, ui ) {
+          const gp = ui.helper[0];
+          self.onDropped (gp, event.clientX - self.offsetx, event.clientY - self.offsety);
+				}
+			});
+    },
+    hello (data){
+			console.log(['hello received', data]);
+			if (this.sync.userId === null) {
+				this.sync.userId = data.userId;
+			}
+		}, 
+    syncGame (data){
 			let domId, toX, toY, fromX, fromY, gp = null;
 
 			console.log(['sync command received', JSON.stringify(data)]);
-			if (data.userId === self.sync.userId) {
+			if (data.userId === this.sync.userId) {
 				console.log(['event was triggered by this user; events already applied', data.userId]);
 				return;
 			}
@@ -181,7 +171,7 @@ export default {
 					// TODO: need to have another way to deal with conflicts when two or more players
 					// 		are attempting to move the same piece at the same time
 					console.log(['chk, dropped', gp, toX, toY, false]);
-					window.Event.$emit("dropped", gp, toX, toY, false);
+          this.onDropped (gp, toX, toY, false);
 					break;
 
 				case 'movefrom':
@@ -191,12 +181,22 @@ export default {
 					gp = $(domId)
 
 					console.log(['chk, pick-up-start', gp, fromX, fromY, false]);
-					window.Event.$emit("pick-up-start", gp, fromX, fromY, false);
+          this.onPickupStart (gp, fromX, fromY, false);
 					break;
 			}
-		});
+		},
+	}, 
+	mounted () {
+		var self = this;
+
+    self.onInit();
+
+		this.socket = ioClient.connect("http://tigris.reliacode.com:8082");
+		console.log(["should have connected to io", this.socket]);
+
+		this.socket.on('hello', self.hello);
+		this.socket.on('sync', self.syncGame);
     this.socket.emit('hello', { greeting: 'hi' });
-		
 	}
 }
 </script>
