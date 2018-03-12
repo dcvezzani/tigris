@@ -46,6 +46,7 @@ export default {
       }
 		}, 
 		applyOffset (gp, x, y) {
+      console.log(["applyOffset (gp, x, y) {:", gp, x, y])
 			let stackOffset = this.gameBoard[y][x].length * this.stackOffset;
 			let left = parseInt($(gp).css('left').replace(/px/, ''));
 			let top = parseInt($(gp).css('top').replace(/px/, ''));
@@ -67,6 +68,7 @@ export default {
     }, 
     onDropped (gpJq, x, y, fromSelf=true, asgroup=false) {
       const gp = gpJq[0];
+      console.log(["onDropped:", gpJq, gp, x, y, fromSelf, asgroup])
       const self = this;
 
       // determine where in the game board data that tile should go
@@ -323,11 +325,12 @@ export default {
 					toY = data.args.to.y;
 					domId = data.args.domId;
 					gameBoard = data.args.gameBoard;
-					gp = $(domId)
+					gp = $(`#${domId}`)
+          console.log(["domId:", `#${domId}`, gp, toX, toY, data.args])
 
 					// TODO: need to have another way to deal with conflicts when two or more players
 					// 		are attempting to move the same piece at the same time
-          this.onDropped (gp, toX, toY, false);
+          this.onDropped (gp, toX * this.width , toY * this.height, false);
 					break;
 
 				case 'movefrom':
