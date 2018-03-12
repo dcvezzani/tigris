@@ -347,7 +347,7 @@ export default {
 	mounted () {
 		const self = this;
 
-		this.socket = ioClient.connect("http://tigris.reliacode.com:8082");
+		this.socket = ioClient.connect("http://reliacode.com:8082");
 
 		this.socket.on('hello', self.hello);
 		this.socket.on('sync', self.syncGame);
